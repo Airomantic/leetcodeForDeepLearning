@@ -159,7 +159,6 @@ if __name__ == "__main__":
     goal = torch.tensor([14, 3])
 
     # genrative path
-    x0 = torch.tensor([0, 3])
     x0 = x0.unsqueeze(0)
     goal = goal.unsqueeze(0)
     x0_hat, trajectory = diffusion_model.generate(x0, model, goal)
