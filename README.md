@@ -23,3 +23,8 @@
     **11. 数学问题**：深度学习中很多算法都涉及到数学，解决数学问题可以加深对深度学习中涉及的数学概念的理解。
 
     **12. 机器学习相关问题**：LeetCode 也有一些与机器学习相关的题目，这些题目直接与深度学习相关，可以帮助你更好地理解模型的工作原理。
+
+![diffusion first generative plan path -- collision](path_planning_colllision.gif)
+![diffusion second generative plan path -- NoBypass](path_planning_NoBypass.gif)
+![diffusion third generative plan path -- Bypass](path_planning_bypass.gif)
+continue ...
