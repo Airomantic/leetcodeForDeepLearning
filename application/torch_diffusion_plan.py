@@ -4,6 +4,8 @@ import imageio
 import torch
 import torch.nn as nn
 import torch.utils.data
+import torch.optim as optim
+from sklearn.metrics import accuracy_score
 
 class PathPlanningDiffusionModel:
     def __init__(self, timesteps, beta_start, beta_end):
@@ -28,6 +30,7 @@ class PathPlanningDiffusionModel:
 
             print(f"xt shape: {xt.shape}, goal shape: {goal.shape}")
             noise_pred = model(torch.cat([xt, goal], dim=-1))
+            noise_pred = noise_pred[:, :xt.shape[1]]  # Splice them before passing them to the model
             print(f"noise_pred.shape:{noise_pred.shape}")
 
             # Ensure noise_pred is correctly sliced to match xt
@@ -115,7 +118,7 @@ if __name__ == "__main__":
     timesteps = 50
     input_dim = 4
     hidden_dim = 128
-    output_dim = 2
+    output_dim = 4
     num_samples = 1000
     batch_size = 64
     epochs = 10
@@ -156,6 +159,7 @@ if __name__ == "__main__":
     goal = torch.tensor([14, 3])
 
     # genrative path
+    x0 = torch.tensor([0, 3])
     x0 = x0.unsqueeze(0)
     goal = goal.unsqueeze(0)
     x0_hat, trajectory = diffusion_model.generate(x0, model, goal)
