@@ -122,6 +122,12 @@ if __name__ == "__main__":
 
     # init model and data
     model = SimpleNN(input_dim, hidden_dim, output_dim)
+
+    # load parameters of model 
+    # model.load_state_dict(torch.load('path_AES_ELK_planning_model.pth'))
+    # model.eval()
+    # print("model load ok")
+    
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
     loss_fn = nn.MSELoss()
 
@@ -137,6 +143,10 @@ if __name__ == "__main__":
             loss.backward()
             optimizer.step()
         print(f"Epoch {epoch + 1}, Loss: {loss.item()}")
+    
+    # save model
+    torch.save(model.state_dict(), "path_AES_ELK_planning_model.pth")
+    print("model save ok")
 
     # init diffusion model
     diffusion_model = PathPlanningDiffusionModel(timesteps, 0.01, 0.1)
