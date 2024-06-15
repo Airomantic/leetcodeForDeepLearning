@@ -3,84 +3,109 @@ import matplotlib.pyplot as plt
 import imageio
 
 class PathPlanningDiffusionModel:
-    def __init__(self, timesteps, beta_start, beta_end) -> None:
+    def __init__(self, timesteps, beta_start, beta_end):
         self.timesteps = timesteps
         self.betas = np.linspace(beta_start, beta_end, timesteps)
         self.alphas = 1 - self.betas
         self.alphas_bars = np.cumprod(self.alphas)
 
-    def forward_diffsion(self, x0, goal): # x0: raw picture or signals
+    def forward_diffusion(self, x0, goal):
         noise = np.random.normal(size=x0.shape)
         xt = x0
         trajectory = [xt]
-        for t in range(self.timesteps): 
+        for t in range(self.timesteps):
             xt = np.sqrt(self.alphas[t]) * xt + np.sqrt(self.betas[t]) * noise + (1 - np.sqrt(self.alphas_bars[t])) * goal
             trajectory.append(xt)
         return trajectory
-    
+
     def reverse_diffusion(self, xt, goal):
         noise = np.random.normal(size=xt.shape)
         for t in reversed(range(self.timesteps)):
-            # xt: The result of the last time step of the forward diffusion process
-            # np.sqrt(self.betas[t]) * noise : use "-" to noise removal
-            # np.sqrt(self.alphas[t]) : use "/" to scale
             xt = (xt - np.sqrt(self.betas[t]) * noise) / np.sqrt(self.alphas[t]) + (1 - np.sqrt(self.alphas_bars[t])) * goal
         return xt
-    
+
     def generate(self, x0, goal):
-        trajectory = self.forward_diffsion(x0, goal)    # The trajectory of all intermediate steps in the diffusion process is obtained
+        trajectory = self.forward_diffusion(x0, goal)
         xt = trajectory[-1]
-        x0_hat = self.reverse_diffusion(xt, goal)       # The denoised data x0_hat is obtained
+        x0_hat = self.reverse_diffusion(xt, goal)
         return x0_hat, trajectory
+
+
+def apply_constraints(trajectory, goal, lane_width, car_width, car_length):
+    constrained_trajectory = []
+    for t, point in enumerate(trajectory):
+        x, y = point
+        # 初始位置位于右侧车道
+        if t < len(trajectory) // 3:
+            # 保持在右侧车道，不要撞到实线
+            y = np.clip(y, car_width / 2, lane_width - car_width / 2)
+        else:
+            # 变道到左侧车道
+            y = np.clip(y, lane_width + car_width / 2, lane_width * 2 - car_width / 2)
+        
+        # 确保不会撞击目标车
+        if np.abs(x - goal[0]) < car_length:
+            x = goal[0] + car_length
+
+        constrained_trajectory.append([x, y])
     
+    # 平滑路径
+    constrained_trajectory = np.array(constrained_trajectory)
+    smoothed_trajectory = np.copy(constrained_trajectory)
+    
+    for i in range(1, len(constrained_trajectory) - 1):
+        smoothed_trajectory[i] = (constrained_trajectory[i-1] + constrained_trajectory[i] + constrained_trajectory[i+1]) / 3
+
+    return smoothed_trajectory
 
 if __name__ == "__main__":
-    # set prameter
+    # 设置参数
     timesteps = 50
     beta_start = 0.01
     beta_end = 0.1
+    lane_width = 4
+    car_width = 1
+    car_length = 2
 
-    # init diffusion model
+    # 初始化扩散模型
     model = PathPlanningDiffusionModel(timesteps, beta_start, beta_end)
 
-    # init position and goal position
-    x0 = np.array([0, 0])
-    goal = np.array([10, 5])
-    # car outline
-    car_width = 1
-    car_height = 2
+    # 初始化自车和目标车位置
+    x0 = np.array([0, 3])
+    goal = np.array([14, 3])
 
-    # genrative path
+    # 生成路径
     x0_hat, trajectory = model.generate(x0, goal)
 
-    # creat GIFs
+    # 施加约束条件
+    constrained_trajectory = apply_constraints(trajectory, goal, lane_width, car_width, car_length)
+
+    # 创建GIF动画
     filenames = []
-    for i, point in enumerate(trajectory):
+    for i, point in enumerate(constrained_trajectory):
         plt.figure()
         ax = plt.gca()
 
-        # plot position of ego and goal
-        car = plt.Rectangle((point[0] - car_width/2, point[1] - car_height/2), car_width, car_height, fill=True, color='blue', label='Car')
-        goal_rect = plt.Rectangle((goal[0] - car_width/2, goal[1] - car_height/2), car_width, car_height, fill=True, color='red', label='goal')
+        # 绘制车道线和虚线
+        plt.plot([0, 0], [-1, 26], 'k-')
+        plt.plot([lane_width, lane_width], [-1, 26], 'k-')
+        plt.plot([lane_width * 2, lane_width * 2], [-1, 26], 'k-')
+        plt.plot([lane_width / 2, lane_width / 2], [-1, 26], 'k:')
+        plt.plot([lane_width + lane_width / 2, lane_width + lane_width / 2], [-1, 26], 'k:')
+
+        # 绘制自车和目标车位置
+        car = plt.Rectangle((point[1] - car_width / 2, point[0] - car_length / 2), car_width, car_length, fill=True, color='blue', label='Ego')
+        goal_rect = plt.Rectangle((goal[1] - car_width / 2, goal[0] - car_length / 2), car_width, car_length, fill=True, color='red', label='Goal')
         ax.add_patch(car)
         ax.add_patch(goal_rect)
 
-        # plot path
+        # 绘制路径
         if i > 0:
-            path = np.array(trajectory[: i + 1])
-            plt.plot(path[:, 0], path[:, 1], 'g-', label='Path')
+            path = np.array(constrained_trajectory[:i + 1])
+            plt.plot(path[:, 1], path[:, 0], 'g-', label='Path')
 
-        # plt.plot(point[0], point[1], 'bo') # ego
-        # plt.plot(goal[0], goal[1], 'ro') # goal position
-        # plt.plot([p[0] for p in trajectory[: i + 1]], [p[1] for p in trajectory[: i + 1]], 'g-')    # path
-        # plt.xlim(-1, 11)
-        # plt.ylim(-1, 6)
-        # filename = f'fram_{i}.png'
-        # filenames.append(filename)
-        # plt.savefig(filename)
-        # plt.close()
-        plt.xlim(-1, 11)
-        plt.ylim(-1, 6)
+        plt.xlim(-1, 6)
+        plt.ylim(-1, 30)
         plt.legend(loc='upper left')
         plt.title(f'Time step {i}')
 
@@ -89,15 +114,15 @@ if __name__ == "__main__":
         plt.savefig(filename)
         plt.close()
 
-    # Save all frames as animation
+    # 保存所有帧为动画
     with imageio.get_writer('path_planning.gif', mode='I', duration=0.1) as writer:
         for filename in filenames:
             image = imageio.imread(filename)
             writer.append_data(image)
 
-    # clear genrative frames files
+    # 清除生成的帧文件
     import os
     for filename in filenames:
         os.remove(filename)
 
-    print("GIF already genrative")
+    print("GIF生成完毕")
