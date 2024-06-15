@@ -123,6 +123,9 @@ if __name__ == "__main__":
     batch_size = 64
     epochs = 10
 
+    train_losses = []
+    val_losses = []
+
     # init model and data
     model = SimpleNN(input_dim, hidden_dim, output_dim)
 
@@ -139,13 +142,31 @@ if __name__ == "__main__":
 
     # train model
     for epoch in range(epochs):
+        model.train()
+        train_loss = 0
         for x, y in data_loader:
             optimizer.zero_grad()
             y_pred = model(x)
             loss = loss_fn(y_pred, y)
             loss.backward()
             optimizer.step()
+            train_loss += loss.item()
         print(f"Epoch {epoch + 1}, Loss: {loss.item()}")
+
+    train_loss /= len(data_loader)
+    train_losses.append(train_loss)
+
+    # val loss
+    model.eval()
+    val_loss = 0
+    with torch.no_grad():
+        for x, y in data_loader:
+            y_pred = model(x)
+            loss = loss_fn(y_pred, y)
+            val_loss += loss.item()
+    
+    val_loss /= len(data_loader)
+    val_losses.append(val_loss)
     
     # save model
     torch.save(model.state_dict(), "path_AES_ELK_planning_model.pth")
@@ -199,6 +220,20 @@ if __name__ == "__main__":
         filenames.append(filename)
         plt.savefig(filename)
         plt.close()
+    
+    # loss
+    filename_losses = []
+    plt.figure()
+    plt.plot(train_losses, label='training Loss')
+    plt.plot(val_losses, label='validation Loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.title("train and validation Loss")
+    filename_loss = f'loss_{i}.png'
+    filename_losses.append(filename_loss)
+    plt.savefig(filename_loss)
+
     
 
     # 保存所有帧为动画
